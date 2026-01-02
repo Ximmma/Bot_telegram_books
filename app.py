@@ -105,7 +105,7 @@ async def list_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_books_page(update, context, page=0)
 
 async def show_books_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
-    items_per_page = 20 # 50 может быть слишком длинным сообщением для Telegram
+    items_per_page = 30 # 50 может быть слишком длинным сообщением для Telegram
     start_idx = page * items_per_page
     end_idx = start_idx + items_per_page
 

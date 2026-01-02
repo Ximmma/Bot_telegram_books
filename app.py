@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -187,10 +188,13 @@ application.add_handler(remove_book_handler)
 application.add_handler(CommandHandler("listbooks", list_books))
 application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^(prev|next)_"))
 
-# --- Установка webhook сразу ---
-application.bot.delete_webhook()
-application.bot.set_webhook(url=WEBHOOK_URL)
-print(f"Webhook установлен: {WEBHOOK_URL}")
+# --- Асинхронная установка webhook ---
+async def setup_webhook():
+    await application.bot.delete_webhook()
+    await application.bot.set_webhook(url=WEBHOOK_URL)
+    print(f"Webhook установлен: {WEBHOOK_URL}")
+
+asyncio.run(setup_webhook())
 
 # --- Endpoint для Telegram ---
 @flask_app.route(f"/{TOKEN}", methods=["POST"])

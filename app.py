@@ -168,23 +168,25 @@ if not TOKEN or not WEBHOOK_URL:
 # --- Создание Application ---
 application = Application.builder().token(TOKEN).build()
 
-# Добавляем обработчики
+# --- Добавляем обработчики ---
 application.add_handler(CommandHandler("start", start))
-add_book_handler = ConversationHandler(
-    entry_points=[CommandHandler("addbook", add_book)],
-    states={
-        TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
-        AUTHOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_author)],
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
+application.add_handler(
+    ConversationHandler(
+        entry_points=[CommandHandler("addbook", add_book)],
+        states={
+            TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
+            AUTHOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_author)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
 )
-remove_book_handler = ConversationHandler(
-    entry_points=[CommandHandler("removebook", remove_book)],
-    states={REMOVE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_book_number)]},
-    fallbacks=[CommandHandler("cancel", cancel)],
+application.add_handler(
+    ConversationHandler(
+        entry_points=[CommandHandler("removebook", remove_book)],
+        states={REMOVE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_book_number)]},
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
 )
-application.add_handler(add_book_handler)
-application.add_handler(remove_book_handler)
 application.add_handler(CommandHandler("listbooks", list_books))
 application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^(prev|next)_"))
 
@@ -194,13 +196,13 @@ async def setup_webhook():
     await application.bot.set_webhook(url=WEBHOOK_URL)
     print(f"Webhook установлен: {WEBHOOK_URL}")
 
-asyncio.run(setup_webhook())
+asyncio.get_event_loop().run_until_complete(setup_webhook())
 
 # --- Endpoint для Telegram ---
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run(application.process_update(update))  # <--- обработка обновления
+    asyncio.get_event_loop().create_task(application.process_update(update))
     return "OK"
 
 # --- Запуск Flask ---

@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 from flask import Flask, request
 
-# Настройка Google Sheets через переменную окружения
+# --- Настройка Google Sheets ---
 def setup_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_json = os.environ.get("GOOGLE_CREDENTIALS")
@@ -26,7 +26,7 @@ def setup_google_sheets():
     sheet = client.open("Pythonbot").sheet1
     return sheet
 
-# Состояния ConversationHandler
+# --- Состояния ConversationHandler ---
 TITLE, AUTHOR, REMOVE = range(3)
 current_page = 0
 books_cache = []
@@ -40,7 +40,6 @@ async def update_books_cache():
         print(f"Ошибка при обновлении кэша: {e}")
 
 # --- Обработчики команд ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Я бот для каталогизации книг.\n"
@@ -156,14 +155,16 @@ async def get_book_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Ошибка: {e}")
         return ConversationHandler.END
 
-# --- Flask для Web Service ---
+# --- Flask Web Service ---
 flask_app = Flask(__name__)
+
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
 if not TOKEN or not WEBHOOK_URL:
     raise ValueError("Не заданы переменные окружения TELEGRAM_TOKEN или WEBHOOK_URL")
 
+# --- Создание Application ---
 application = Application.builder().token(TOKEN).build()
 
 # Добавляем обработчики
@@ -186,19 +187,19 @@ application.add_handler(remove_book_handler)
 application.add_handler(CommandHandler("listbooks", list_books))
 application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^(prev|next)_"))
 
-# Webhook endpoint
+# --- Установка webhook сразу ---
+application.bot.delete_webhook()
+application.bot.set_webhook(url=WEBHOOK_URL)
+print(f"Webhook установлен: {WEBHOOK_URL}")
+
+# --- Endpoint для Telegram ---
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
     application.update_queue.put(update)
     return "OK"
 
-@flask_app.before_first_request
-def set_webhook():
-    application.bot.delete_webhook()
-    application.bot.set_webhook(url=WEBHOOK_URL)
-    print(f"Webhook установлен: {WEBHOOK_URL}")
-
+# --- Запуск Flask ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     flask_app.run(host="0.0.0.0", port=port)

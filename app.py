@@ -15,19 +15,27 @@ from telegram.ext import (
 )
 from flask import Flask, request
 
-# --- Настройка Google Sheets ---
+# --- Flask app ---
+flask_app = Flask(__name__)
+
+# --- Переменные окружения ---
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
+
+if not TOKEN or not WEBHOOK_URL or not GOOGLE_CREDENTIALS:
+    raise ValueError("Не заданы переменные окружения TELEGRAM_TOKEN, WEBHOOK_URL или GOOGLE_CREDENTIALS")
+
+# --- Google Sheets ---
 def setup_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
-    if not creds_json:
-        raise ValueError("Не задана переменная окружения GOOGLE_CREDENTIALS")
-    creds_dict = json.loads(creds_json)
+    creds_dict = json.loads(GOOGLE_CREDENTIALS)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open("Pythonbot").sheet1
     return sheet
 
-# --- Состояния ConversationHandler ---
+# --- Conversation states ---
 TITLE, AUTHOR, REMOVE = range(3)
 current_page = 0
 books_cache = []
@@ -40,7 +48,7 @@ async def update_books_cache():
     except Exception as e:
         print(f"Ошибка при обновлении кэша: {e}")
 
-# --- Обработчики команд ---
+# --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Я бот для каталогизации книг.\n"
@@ -156,16 +164,7 @@ async def get_book_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Ошибка: {e}")
         return ConversationHandler.END
 
-# --- Flask Web Service ---
-flask_app = Flask(__name__)
-
-TOKEN = os.environ.get("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
-
-if not TOKEN or not WEBHOOK_URL:
-    raise ValueError("Не заданы переменные окружения TELEGRAM_TOKEN или WEBHOOK_URL")
-
-# --- Создание Application ---
+# --- Telegram Bot Application ---
 application = Application.builder().token(TOKEN).build()
 
 # --- Добавляем обработчики ---
@@ -190,19 +189,21 @@ application.add_handler(
 application.add_handler(CommandHandler("listbooks", list_books))
 application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^(prev|next)_"))
 
-# --- Асинхронная установка webhook ---
+# --- Event loop для webhook ---
+loop = asyncio.get_event_loop()
+
 async def setup_webhook():
     await application.bot.delete_webhook()
     await application.bot.set_webhook(url=WEBHOOK_URL)
     print(f"Webhook установлен: {WEBHOOK_URL}")
 
-asyncio.get_event_loop().run_until_complete(setup_webhook())
+loop.run_until_complete(setup_webhook())
 
-# --- Endpoint для Telegram ---
+# --- Flask endpoint ---
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.get_event_loop().create_task(application.process_update(update))
+    asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
     return "OK"
 
 # --- Запуск Flask ---

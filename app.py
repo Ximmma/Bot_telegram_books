@@ -200,7 +200,7 @@ asyncio.run(setup_webhook())
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put(update)
+    asyncio.run(application.process_update(update))  # <--- обработка обновления
     return "OK"
 
 # --- Запуск Flask ---

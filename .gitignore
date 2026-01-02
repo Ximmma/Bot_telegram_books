@@ -10,7 +10,7 @@ venv/
 env/
 .venv/
 
-# Локальные конфиги
+# Локальные конфиги и секреты
 .env
 credentials.json
 

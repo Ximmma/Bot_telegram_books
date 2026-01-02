@@ -1,6 +1,5 @@
 import os
 import json
-import asyncio
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,10 +12,6 @@ from telegram.ext import (
     ConversationHandler,
     CallbackQueryHandler
 )
-from flask import Flask, request
-
-# --- Flask app ---
-flask_app = Flask(__name__)
 
 # --- Переменные окружения ---
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -189,24 +184,11 @@ application.add_handler(
 application.add_handler(CommandHandler("listbooks", list_books))
 application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^(prev|next)_"))
 
-# --- Event loop для webhook ---
-loop = asyncio.get_event_loop()
-
-async def setup_webhook():
-    await application.bot.delete_webhook()
-    await application.bot.set_webhook(url=WEBHOOK_URL)
-    print(f"Webhook установлен: {WEBHOOK_URL}")
-
-loop.run_until_complete(setup_webhook())
-
-# --- Flask endpoint ---
-@flask_app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
-    return "OK"
-
-# --- Запуск Flask ---
+# --- Запуск webhook ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host="0.0.0.0", port=port)
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        webhook_url=WEBHOOK_URL
+    )
